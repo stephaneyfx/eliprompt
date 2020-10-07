@@ -1,10 +1,13 @@
-[![Crate](https://img.shields.io/crates/v/eliprompt.svg?style=flat-square&logo=rust)](https://crates.io/crates/eliprompt)
-[![Docs](https://img.shields.io/badge/docs-eliprompt-blue?style=flat-square)](https://docs.rs/eliprompt)
-[![MIT license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+# Overview
+- [📦 crates.io](https://crates.io/crates/eliprompt)
+- [📖 Documentation](https://docs.rs/eliprompt)
+- [⚖ zlib license](https://opensource.org/licenses/Zlib)
 
-<!-- cargo-sync-readme start -->
+CLI to generate a shell prompt.
 
-Command-line application to generate a shell prompt.
+# Font
+The default configuration uses symbols from [Nerd Fonts](https://www.nerdfonts.com/) and expects
+one of them to be installed.
 
 # Shell support
 Only zsh is supported. Please open an issue if support for another shell is desired.
@@ -19,11 +22,10 @@ Make sure `eliprompt` is in your `PATH` and add the following to `.zshrc`:
 eval "$(eliprompt install --zsh)"
 ```
 
-# Overview
+# Configuration
 The prompt is made of blocks. Each block contains the text to display as well as the style
 (foreground and background colors).
 
-# Configuration
 The configuration is stored in `~/.config/eliprompt/config.json`. It consists of a JSON object
 of type `Config`. `Config` and the other JSON types involved are detailed below.
 
@@ -163,7 +165,8 @@ Shows the current working directory. JSON object with the following fields:
 }
 ```
 
+# Contribute
+All contributions shall be licensed under the [zlib license](https://opensource.org/licenses/Zlib).
+
 # Related projects
 [starship](https://github.com/starship/starship) provides more blocks and supports more shells.
-
-<!-- cargo-sync-readme end -->

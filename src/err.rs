@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the MIT license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
 
 use std::io;
 use thiserror::Error;
