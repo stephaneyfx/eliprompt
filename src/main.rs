@@ -2,124 +2,119 @@
 
 #![deny(warnings)]
 
-use clap::{App, AppSettings, Arg, ArgGroup, ArgMatches, SubCommand};
 use eliprompt::{Block, BlockProducer, Config, Environment, Style};
 use moniclock::Clock;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     env,
     error::Error,
-    fmt::Display,
+    fmt::{self, Display},
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
+    str::FromStr,
     sync::mpsc::{sync_channel, RecvTimeoutError},
     thread,
     time::{Duration, Instant},
 };
+use structopt::StructOpt;
 use thiserror::Error;
 
+/// Generates shell prompt
+#[derive(Debug, StructOpt)]
+#[structopt(author)]
+enum Command {
+    Prompt(PromptCommand),
+    StartTimer(StartTimerCommand),
+    StopTimer(StopTimerCommand),
+    Install(InstallCommand),
+    /// Prints default configuration
+    PrintDefaultConfig,
+}
+
+/// Prints prompt
+#[derive(Debug, StructOpt)]
+struct PromptCommand {
+    /// Working directory or current working directory if not specified.
+    #[structopt(long)]
+    pwd: Option<PathBuf>,
+    /// Application state as returned from a previous run
+    #[structopt(long, default_value)]
+    state: State,
+    /// Prints errors and duration of the prompt generation
+    #[structopt(long)]
+    test: bool,
+    /// Path to the configuration file
+    #[structopt(long = "config")]
+    config_path: Option<PathBuf>,
+    /// Uses symbol fallback
+    #[structopt(long)]
+    symbol_fallback: bool,
+    /// Shell to generate prompt for
+    #[structopt(long, default_value)]
+    shell: ShellType,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum::Display, strum::EnumString)]
+#[strum(serialize_all = "kebab-case")]
+enum ShellType {
+    Generic,
+    Zsh,
+}
+
+impl Default for ShellType {
+    fn default() -> Self {
+        ShellType::Generic
+    }
+}
+
+/// Starts timer and prints new state to stdout
+#[derive(Debug, StructOpt)]
+struct StartTimerCommand {
+    /// Application state as returned from a previous run
+    #[structopt(long, default_value)]
+    state: State,
+}
+
+/// Stops timer and prints new state to stdout
+#[derive(Debug, StructOpt)]
+struct StopTimerCommand {
+    /// Application state as returned from a previous run
+    #[structopt(long)]
+    state: State,
+    /// Exit code of the timed command
+    #[structopt(long)]
+    exit_code: i32,
+}
+
+/// Generates configuration for the given shell
+///
+/// The output should be `eval`'ed in the appropriate shell configuration file. For zsh, it is
+/// `.zshrc`.
+#[derive(Debug, StructOpt)]
+struct InstallCommand {
+    /// Shell to install prompt for
+    #[structopt(long)]
+    shell: ShellType,
+}
+
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
-const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
-const APP_AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
+
+static DEFAULT_CONFIG_PATH: Lazy<Option<PathBuf>> = Lazy::new(|| {
+    let mut path = dirs::config_dir()?;
+    path.extend(&[APP_NAME, "config.json"]);
+    Some(path)
+});
 
 fn run() -> Result<(), AppError> {
-    let mut default_config_path = dirs::config_dir().ok_or(AppError::GettingConfigDirFailed)?;
-    default_config_path.extend(&[APP_NAME, "config.json"]);
-    let config_help = format!(
-        "Path to the configuration file (default: {})",
-        default_config_path.display(),
-    );
-    let state_arg = Arg::with_name("state")
-        .help("Application state as returned from a previous run")
-        .long("state")
-        .takes_value(true);
-    let prev_exit_code_arg = Arg::with_name("prev-exit-code")
-        .help("Exit code of the previous command")
-        .long("prev-exit-code")
-        .takes_value(true);
-    let args = App::new(APP_NAME)
-        .version(APP_VERSION)
-        .author(APP_AUTHORS)
-        .about("Generates shell prompts")
-        .setting(AppSettings::SubcommandRequired)
-        .subcommand(
-            SubCommand::with_name("prompt")
-                .about("Prints the prompt")
-                .arg(prev_exit_code_arg.clone())
-                .arg(
-                    Arg::with_name("pwd")
-                        .help("Working directory")
-                        .long("pwd")
-                        .takes_value(true)
-                )
-                .arg(state_arg.clone())
-                .arg(
-                    Arg::with_name("test")
-                        .help("Prints errors and duration of the prompt generation")
-                        .long("test")
-                )
-                .arg(
-                    Arg::with_name("config")
-                        .help(&config_help)
-                        .long("config")
-                        .takes_value(true)
-                )
-                .arg(
-                    Arg::with_name("symbol-fallback")
-                        .help("Uses symbol fallback")
-                        .long("symbol-fallback")
-                )
-                .arg(
-                    Arg::with_name("zsh")
-                        .help("Generates a prompt for zsh")
-                        .long("zsh")
-                )
-        )
-        .subcommand(
-            SubCommand::with_name("store")
-                .about("Stores state used to render the prompt. The new state is printed to \
-                    stdout.")
-                .arg(state_arg.clone().required(true))
-                .arg(
-                    Arg::with_name("start-timer")
-                        .help("Starts timer")
-                        .long("start-timer")
-                )
-                .arg(
-                    Arg::with_name("stop-timer")
-                        .help("Stops timer")
-                        .long("stop-timer")
-                        .conflicts_with("start-timer")
-                )
-                .arg(prev_exit_code_arg)
-        )
-        .subcommand(
-            SubCommand::with_name("install")
-                .about("Generates prompt configuration for the given shell. The output should be \
-                    `eval`ed in the appropriate shell configuration file.")
-                .arg(
-                    Arg::with_name("zsh")
-                        .help("Generates for zsh. `eval` the output in `.zshrc`")
-                        .long("zsh")
-                )
-                .group(
-                    ArgGroup::with_name("shell")
-                        .args(&["zsh"])
-                        .required(true)
-                )
-        )
-        .subcommand(
-            SubCommand::with_name("print-default-config")
-                .about("Prints the default configuration.")
-        )
-        .get_matches();
-    match args.subcommand() {
-        ("prompt", args) => process_prompt(args, &default_config_path)?,
-        ("store", Some(args)) => process_store(args)?,
-        ("install", Some(args)) => process_install(args)?,
-        ("print-default-config", _) => print_default_config(),
-        _ => unreachable!(),
+    let cmd = Command::from_args();
+    match cmd {
+        Command::Prompt(cmd) => generate_prompt(cmd)?,
+        Command::StartTimer(cmd) => start_timer(cmd),
+        Command::StopTimer(cmd) => stop_timer(cmd),
+        Command::Install(cmd) => install(cmd)?,
+        Command::PrintDefaultConfig => print_default_config(),
     }
     Ok(())
 }
@@ -139,36 +134,26 @@ fn print_error(mut e: &dyn Error) {
     }
 }
 
-fn process_prompt(
-    args: Option<&ArgMatches<'_>>,
-    default_config_path: &Path,
-) -> Result<(), AppError> {
+fn generate_prompt(cmd: PromptCommand) -> Result<(), AppError> {
     let t0 = Instant::now();
-    let is_test = args.map_or(false, |args| args.is_present("test"));
     let mut buffer = Vec::<u8>::new();
-    if args.map_or(false, |args| args.is_present("zsh")) {
-        print_or_fallback(&mut Zsh(&mut buffer), args, default_config_path, is_test)?;
-    } else {
-        print_or_fallback(&mut GenericShell(&mut buffer), args, default_config_path, is_test)?;
+    match cmd.shell {
+        ShellType::Generic => print_or_fallback(&mut GenericShell(&mut buffer), &cmd)?,
+        ShellType::Zsh => print_or_fallback(&mut Zsh(&mut buffer), &cmd)?,
     }
     println!();
     io::stdout().write_all(&buffer).map_err(AppError::Print)?;
     let elapsed = t0.elapsed();
-    if is_test {
+    if cmd.test {
         println!("\nPrompt generation took {}", humantime::format_duration(elapsed));
     }
     Ok(())
 }
 
-fn print_or_fallback<S: Shell>(
-    shell: &mut S,
-    args: Option<&ArgMatches<'_>>,
-    default_config_path: &Path,
-    is_test: bool,
-) -> Result<(), AppError> {
-    match print_prompt(shell, args, default_config_path) {
+fn print_or_fallback<S: Shell>(shell: &mut S, cmd: &PromptCommand) -> Result<(), AppError> {
+    match print_prompt(shell, cmd) {
         Ok(()) => Ok(()),
-        Err(e) if is_test => Err(e),
+        Err(e) if cmd.test => Err(e),
         Err(e) => {
             let _ = print_fallback_prompt(shell);
             Err(e)
@@ -176,33 +161,20 @@ fn print_or_fallback<S: Shell>(
     }
 }
 
-fn print_prompt<S: Shell>(
-    shell: &mut S,
-    args: Option<&ArgMatches<'_>>,
-    default_config_path: &Path,
-) -> Result<(), AppError> {
-    let exit_code = args
-        .and_then(|args| args.value_of("prev-exit-code"))
-        .map(|code| code.parse().map_err(|_| AppError::BadExitCode(code.into())))
-        .transpose()?;
-    let working_dir = args.and_then(|args| args.value_of("pwd")).map(PathBuf::from);
-    let state = args
-        .and_then(|args| args.value_of("state"))
-        .map(|state| read_state(&state))
-        .transpose()?
-        .unwrap_or_default();
-    let config = match args.and_then(|args| args.value_of("config")) {
-        Some(path) => read_config(Path::new(path)),
-        None if default_config_path.exists() => read_config(default_config_path),
-        None => Ok(default_pretty_config()),
+fn print_prompt<S: Shell>(shell: &mut S, cmd: &PromptCommand) -> Result<(), AppError> {
+    let config = match (&cmd.config_path, &*DEFAULT_CONFIG_PATH) {
+        (Some(path), _) => read_config(path),
+        (_, Some(path)) if path.exists() => read_config(path),
+        _ => Ok(default_pretty_config()),
     }?;
-    let symbol_fallback = args.map_or(false, |args| args.is_present("symbol-fallback"));
+    let symbol_fallback = cmd.symbol_fallback;
     let timeout = config.timeout();
+    let state = cmd.state.clone();
+    let working_dir = cmd.pwd.clone();
     let (sender, receiver) = sync_channel(1);
     let blocks = thread::spawn(move || {
         let blocks = make_prompt(
             &config,
-            exit_code,
             working_dir.as_deref(),
             symbol_fallback,
             state,
@@ -236,12 +208,11 @@ fn show_prompt<S: Shell>(shell: &mut S, blocks: Vec<Block>) -> Result<(), AppErr
 
 fn make_prompt(
     config: &Config,
-    exit_code: Option<i32>,
     working_dir: Option<&Path>,
     symbol_fallback: bool,
     state: State,
 ) -> Result<Vec<Block>, AppError> {
-    let exit_code = exit_code.unwrap_or(state.prev_exit_code);
+    let exit_code = state.prev_exit_code;
     let environment = match working_dir {
         Some(p) => Environment::new(p),
         None => Environment::current(),
@@ -265,46 +236,28 @@ fn print_fallback_prompt<S: Shell>(shell: &mut S) -> Result<(), AppError> {
     show_prompt(shell, blocks)
 }
 
-fn process_store(args: &ArgMatches<'_>) -> Result<(), AppError> {
-    let state_str = args.value_of("state").expect("`state` is a mandatory argument").trim();
-    let mut state = read_state(state_str)?;
-    if args.is_present("start-timer") {
-        start_timer(&mut state);
-    } else if args.is_present("stop-timer") {
-        stop_timer(&mut state);
-    }
-    if let Some(code) = args.value_of("prev-exit-code") {
-        state.prev_exit_code = code.parse().map_err(|_| AppError::BadExitCode(code.into()))?;
-    }
-    print_state(&state);
-    Ok(())
-}
-
-fn start_timer(state: &mut State) {
-    state.prev_cmd_duration = CmdDuration::StartedAt(Clock::new().elapsed());
-}
-
-fn stop_timer(state: &mut State) {
-    let start = match state.prev_cmd_duration {
-        CmdDuration::StartedAt(start) => start,
-        CmdDuration::Unknown
-        | CmdDuration::Elapsed(_) => {
-            state.prev_cmd_duration = CmdDuration::Unknown;
-            return;
-        }
+fn start_timer(_: StartTimerCommand) {
+    let state = State {
+        prev_cmd_duration: CmdDuration::StartedAt(Clock::new().elapsed()),
+        prev_exit_code: 0,
     };
-    let end = start.max(Clock::new().elapsed());
-    state.prev_cmd_duration = CmdDuration::Elapsed(end - start);
+    print_state(&state);
 }
 
-fn read_state(state_str: &str) -> Result<State, AppError> {
-    let state_str = state_str.trim();
-    if state_str.is_empty() { return Ok(Default::default()) }
-    let state_bytes = bs58::decode(state_str)
-        .with_prepared_alphabet(bs58::Alphabet::BITCOIN)
-        .into_vec()
-        .map_err(AppError::DecodingStateFailed)?;
-    Ok(serde_json::from_slice(&state_bytes).map_err(AppError::ParsingStateFailed)?)
+fn stop_timer(cmd: StopTimerCommand) {
+    let duration = match cmd.state.prev_cmd_duration {
+        CmdDuration::StartedAt(start) => {
+            let end = start.max(Clock::new().elapsed());
+            CmdDuration::Elapsed(end - start)
+        }
+        CmdDuration::Unknown
+        | CmdDuration::Elapsed(_) => CmdDuration::Unknown,
+    };
+    let state = State {
+        prev_exit_code: cmd.exit_code,
+        prev_cmd_duration: duration,
+    };
+    print_state(&state);
 }
 
 fn print_state(state: &State) {
@@ -320,25 +273,25 @@ fn read_config(path: &Path) -> Result<Config, AppError> {
         .map_err(AppError::BadConfig)
 }
 
-fn process_install(args: &ArgMatches<'_>) -> Result<(), AppError> {
+fn install(cmd: InstallCommand) -> Result<(), AppError> {
     let program_path = env::current_exe().map_err(AppError::GettingProgramPathFailed)?;
     let program_path = program_path.to_str().ok_or(AppError::ProgramPathNotUnicode)?;
-    if args.is_present("zsh") {
-        install_zsh(program_path);
+    match cmd.shell {
+        ShellType::Generic => Err(AppError::CannotInstallGenericShell),
+        ShellType::Zsh => install_zsh(program_path),
     }
-    Ok(())
 }
 
-fn install_zsh(program_path: &str) {
+fn install_zsh(program_path: &str) -> Result<(), AppError> {
     let config = r####"
 eliprompt_precmd() {
     prev_status=$?
-    ELIPROMPT_STATE=$(ELIPROMPT_EXE store --state "$ELIPROMPT_STATE" --stop-timer --prev-exit-code $prev_status)
-    PROMPT=$(ELIPROMPT_EXE prompt --state "$ELIPROMPT_STATE" --zsh)
+    ELIPROMPT_STATE=$(ELIPROMPT_EXE stop-timer --state "$ELIPROMPT_STATE" --exit-code $prev_status)
+    PROMPT=$(ELIPROMPT_EXE prompt --state "$ELIPROMPT_STATE" --shell zsh)
 }
 
 eliprompt_preexec() {
-    ELIPROMPT_STATE=$(ELIPROMPT_EXE store --state "$ELIPROMPT_STATE" --start-timer --prev-exit-code 0)
+    ELIPROMPT_STATE=$(ELIPROMPT_EXE start-timer --state "$ELIPROMPT_STATE")
 }
 
 [[ -v precmd_functions ]] || precmd_functions=()
@@ -349,6 +302,7 @@ eliprompt_preexec() {
 "####;
     let config = config.replace("ELIPROMPT_EXE", program_path);
     println!("{}", config);
+    Ok(())
 }
 
 #[derive(Debug, Error)]
@@ -357,8 +311,6 @@ enum AppError {
     BadConfig(#[source] serde_json::Error),
     #[error("Failed to read configuration file")]
     ReadingConfigFailed(#[source] io::Error),
-    #[error("Invalid exit code {0}")]
-    BadExitCode(String),
     #[error("Failed to print prompt")]
     Print(#[source] io::Error),
     #[error("Error while building prompt")]
@@ -371,18 +323,42 @@ enum AppError {
     DecodingStateFailed(#[source] bs58::decode::Error),
     #[error("Failed to parse state")]
     ParsingStateFailed(#[source] serde_json::Error),
-    #[error("Failed to get the app configuration directory")]
-    GettingConfigDirFailed,
     #[error("Failed to get the path to this program")]
     GettingProgramPathFailed(#[source] io::Error),
     #[error("The path to this program is not Unicode")]
     ProgramPathNotUnicode,
+    #[error("Installation is not possible for generic shell")]
+    CannotInstallGenericShell,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct State {
+struct State {
     prev_exit_code: i32,
     prev_cmd_duration: CmdDuration,
+}
+
+impl Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let state_str =
+            bs58::encode(serde_json::to_string(self).expect("Serializing state cannot fail"))
+                .with_prepared_alphabet(bs58::Alphabet::BITCOIN)
+                .into_string();
+        f.write_str(&state_str)
+    }
+}
+
+impl FromStr for State {
+    type Err = AppError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let state_str = s.trim();
+        if state_str.is_empty() { return Ok(Default::default()) }
+        let state_bytes = bs58::decode(state_str)
+            .with_prepared_alphabet(bs58::Alphabet::BITCOIN)
+            .into_vec()
+            .map_err(AppError::DecodingStateFailed)?;
+        Ok(serde_json::from_slice(&state_bytes).map_err(AppError::ParsingStateFailed)?)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
