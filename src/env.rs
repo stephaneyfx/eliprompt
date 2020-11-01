@@ -1,6 +1,6 @@
 // Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
 
-use crate::{Error, Symbol};
+use crate::Error;
 use git2::Repository;
 use once_cell::sync::OnceCell;
 use std::{
@@ -15,19 +15,17 @@ pub struct Environment {
     prev_exit_code: i32,
     repo: OnceCell<Option<Repository>>,
     prev_cmd_duration: Option<Duration>,
-    regular_symbols: bool,
+    force_alternative_prompt: bool,
 }
 
 impl Environment {
     pub fn new<P: Into<PathBuf>>(working_dir: P) -> Result<Self, Error> {
-        let term = env::var("TERM").unwrap_or(String::new());
-        let regular_symbols = term != "linux";
         Ok(Environment {
             working_dir: working_dir.into(),
             prev_exit_code: 0,
             repo: OnceCell::new(),
             prev_cmd_duration: None,
-            regular_symbols,
+            force_alternative_prompt: false,
         })
     }
     pub fn current() -> Result<Self, Error> {
@@ -43,28 +41,34 @@ impl Environment {
         Self { prev_cmd_duration: Some(d), ..self }
     }
 
-    pub fn with_regular_symbols(self, regular_symbols: bool) -> Self {
-        Self { regular_symbols, ..self }
+    pub fn force_alternative_prompt(self, yes: bool) -> Self {
+        Self { force_alternative_prompt: yes, ..self }
+    }
+
+    pub fn alternative_prompt_is_used(&self) -> bool {
+        if self.force_alternative_prompt { return true; }
+        let alternative_requested = env::var("ELIPROMPT_ALTERNATIVE_PROMPT").is_ok();
+        let terms_using_alternative = ["linux"];
+        let term_uses_alternative = env::var("TERM").map_or(false, |term| {
+            terms_using_alternative.contains(&&*term)
+        });
+        alternative_requested || term_uses_alternative
     }
 
     pub fn working_dir(&self) -> &Path {
         &self.working_dir
     }
 
-    pub fn repo(&self) -> Result<Option<&Repository>, git2::Error> {
-        let mut error = None;
+    pub fn repo(&self) -> Option<&Repository> {
         let repo = self.repo.get_or_init(|| match Repository::discover(&self.working_dir) {
             Ok(repo) => Some(repo),
+            Err(e) if e.code() == git2::ErrorCode::NotFound => None,
             Err(e) => {
-                error = Some(e);
+                tracing::error!("Failed to open git repository: {}", e);
                 None
             }
         });
-        match error {
-            Some(e) if e.code() == git2::ErrorCode::NotFound => Ok(None),
-            Some(e) => Err(e),
-            None => Ok(repo.as_ref()),
-        }
+        repo.as_ref()
     }
 
     pub fn prev_exit_code(&self) -> i32 {
@@ -73,14 +77,6 @@ impl Environment {
 
     pub fn prev_cmd_duration(&self) -> Option<Duration> {
         self.prev_cmd_duration
-    }
-
-    pub fn regular_symbols(&self) -> bool {
-        self.regular_symbols
-    }
-
-    pub fn symbol_str<'a>(&self, symbol: &'a Symbol) -> &'a str {
-        symbol.as_str(self.regular_symbols)
     }
 }
 

@@ -1,6 +1,6 @@
 // Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
 
-use crate::{Block, Environment, Error, Style};
+use crate::{Block, Environment, Style};
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -11,6 +11,8 @@ pub struct WorkingDirectory {
     style: Style,
     #[serde(default = "default_home_as_tilde")]
     home_as_tilde: bool,
+    #[serde(default = "default_prefix")]
+    prefix: String,
 }
 
 impl WorkingDirectory {
@@ -18,18 +20,29 @@ impl WorkingDirectory {
         WorkingDirectory {
             style: Default::default(),
             home_as_tilde: default_home_as_tilde(),
+            prefix: default_prefix(),
         }
     }
 
-    pub fn with_style(self, style: Style) -> Self {
-        Self { style, ..self }
+    pub fn with_style<T>(self, style: T) -> Self
+    where
+        T: Into<Style>,
+    {
+        Self { style: style.into(), ..self }
     }
 
     pub fn with_home_as_tilde(self, home_as_tilde: bool) -> Self {
         Self { home_as_tilde, ..self }
     }
 
-    pub fn produce(&self, environment: &Environment) -> Result<Vec<Block>, Error> {
+    pub fn with_prefix<T>(self, prefix: T) -> Self
+    where
+        T: Into<String>,
+    {
+        Self { prefix: prefix.into(), ..self }
+    }
+
+    pub fn produce(&self, environment: &Environment) -> Vec<Block> {
         let pwd = environment.working_dir();
         let pwd = if self.home_as_tilde {
             match home_dir() {
@@ -43,7 +56,10 @@ impl WorkingDirectory {
         } else {
             pwd.to_owned()
         };
-        Ok(vec![Block::new(pwd.to_string_lossy()).with_style(self.style.clone())])
+        vec![
+            Block::new(&self.prefix).with_style(&self.style),
+            Block::new(pwd.to_string_lossy()).with_style(&self.style),
+        ]
     }
 }
 
@@ -55,4 +71,8 @@ impl Default for WorkingDirectory {
 
 fn default_home_as_tilde() -> bool {
     true
+}
+
+fn default_prefix() -> String {
+    "\u{f07c}".into()
 }

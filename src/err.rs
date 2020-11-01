@@ -7,6 +7,4 @@ use thiserror::Error;
 pub enum Error {
     #[error("Failed to get current working directory")]
     GettingPwdFailed(#[source] io::Error),
-    #[error("Git error")]
-    Git(#[from] git2::Error),
 }

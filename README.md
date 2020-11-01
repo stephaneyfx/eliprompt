@@ -6,8 +6,8 @@
 CLI to generate a shell prompt.
 
 # Font
-The default configuration uses symbols from [Nerd Fonts](https://www.nerdfonts.com/) and expects
-one of them to be installed.
+The default prompt configuration uses symbols from [Nerd Fonts](https://www.nerdfonts.com/) and
+expects one of them to be installed.
 
 # Shell support
 Only zsh is supported. Please open an issue if support for another shell is desired.
@@ -19,7 +19,7 @@ cargo install eliprompt
 
 Make sure `eliprompt` is in your `PATH` and add the following to `.zshrc`:
 ```sh
-eval "$(eliprompt install --zsh)"
+eval "$(eliprompt install --shell zsh)"
 ```
 
 # Configuration
@@ -27,141 +27,338 @@ The prompt is made of blocks. Each block contains the text to display as well as
 (foreground and background colors).
 
 The configuration is stored in `~/.config/eliprompt/config.json`. It consists of a JSON object
-of type `Config`. `Config` and the other JSON types involved are detailed below.
+of type [`Config`](#config-type). `Config` and the other JSON types involved are detailed below.
 
-## `BlockProducer`
-JSON object with a single field among:
-- `Elapsed`:
-  - Type: `Elapsed`
-- `ExitCode`:
-  - Type: `ExitCode`
-- `GitHead`:
-  - Type: `GitHead`
-- `GitPath`:
-  - Type: `GitPath`
-- `WorkingDirectory`:
-  - Type: `WorkingDirectory`
-- `Or`:
-  - Type: List of `BlockProducer`s
-  - Producers are tried in order until one produces blocks.
+## `BlockProducer` type
+JSON object with a single field named after its type among:
+- [`Elapsed`](#elapsed-type)
+- [`ExitCode`](#exitcode-type)
+- [`GitHead`](#githead-type)
+- [`GitPath`](#gitpath-type)
+- [`Hostname`](#hostname-type)
+- [`WorkingDirectory`](#workingdirectory-type)
+- [`Username`](#username-type)
+- [`Newline`](#newline-type)
+- [`Space`](#space-type)
+- [`Text`](#text-type)
+- [`ExitStatusSymbol`](#exitstatussymbol-type)
+- [`Or`](#or-type)
+- [`Sequence`](#sequence-type)
+- [`Separated`](#separated-type)
+- [`Styled`](#styled-type)
 
-## `Color`
+## `Color` type
 String with a CSS color name (e.g. `"red"`) or a CSS sRGB color (e.g. `"#ff1000"`).
 
-## `Config`
+## `Config` type
 Root configuration object. JSON object with the following fields:
-- `block_producers` [optional]:
-  - Type: List of `BlockProducer`s
-  - The sequence of all produced blocks is what makes up the prompt.
 - `prompt` [optional]:
-  - Type: `Symbol`
-  - Text to display before the cursor where the next command will be entered. Separated from the
-cursor by a space.
-- `prompt_style` [optional]:
-  - Type: `Style`
-  - Style to display the prompt when the previous command exited with zero.
-- `prompt_error_style` [optional]:
-  - Type: `Style`
-  - Style to display the prompt when the previous command exited with non-zero.
-- `separator` [optional]:
-  - Type: `Symbol`
-  - Separator between block sequences from different producers.
-- `separator_style` [optional]:
-  - Type: `Style`
+  - Type: [`BlockProducer`](#blockproducer-type)
+  - The prompt definition.
+- `alternative_prompt` [optional]:
+  - Type: [`BlockProducer`](#blockproducer-type) or `null`
+  - Alternative prompt definition to use when `$TERM` is `linux` or the environment variable
+    `ELIPROMPT_ALTERNATIVE_PROMPT` is defined.
 - `timeout` [optional]:
-  - Type: `Duration`
-  - Maximum duration to build the prompt. If it takes longer, a default prompt will be shown.
+  - Type: [`Duration`](#duration-type)
+  - Maximum time allocated to build the prompt. If it takes longer, a default prompt will be shown.
 
-## `Duration`
+## `Duration` type
 String containing a duration with unit, e.g. `"3s"` for 3 seconds.
 
-## `Elapsed`
+## `Elapsed` type
 Shows the duration of the previous command. JSON object with the following fields:
 - `style` [optional]:
-  - Type: `Style`
+  - Type: [`Style`](#style-type)
 - `prefix` [optional]:
-  - Type: `Symbol`
+  - Type: `String`
   - Text to display before the duration.
 - `threshold` [optional]:
-  - Type: `Duration`
+  - Type: [`Duration`](#duration-type)
   - The duration of a command is displayed if and only if it took longer than the threshold.
 
-## `ExitCode`
+## `ExitCode` type
 Shows the exit code of the previous command if it was not zero. JSON object with the following
 fields:
 - `style` [optional]:
-  - Type: `Style`
+  - Type: [`Style`](#style-type)
 - `prefix` [optional]:
-  - Type: `Symbol`
+  - Type: `String`
   - Text to display before the exit code.
 
-## `GitHead`
+## `ExitStatusSymbol` type
+- `style` [optional]:
+  - Type: [`Style`](#style-type)
+  - Style to use when the exit status is zero.
+- `error_style` [optional]:
+  - Type: [`Style`](#style-type)
+  - Style to use when the exit status is not zero.
+- `contents`:
+  - Type: `String`
+
+## `GitHead` type
 Shows the current git branch. JSON object with the following fields:
 - `style` [optional]:
-  - Type: `Style`
+  - Type: [`Style`](#style-type)
 - `prefix` [optional]:
-  - Type: `Symbol`
+  - Type: `String`
   - Text to display before the git branch.
 
-## `GitPath`
+## `GitPath` type
 If the current working directory is in a git repository, it is shown relative to the root of the
 repository. JSON object with the following fields:
 - `style` [optional]:
-  - Type: `Style`
+  - Type: [`Style`](#style-type)
+- `prefix` [optional]:
+  - Type: `String`
+  - Text to display before the path.
 
-## `Style`
+## `Hostname` type
+- `style` [optional]:
+  - Type: [`Style`](#style-type)
+- `prefix` [optional]:
+  - Type: `String`
+  - Text to display before the hostname.
+
+## `Newline` type
+Adds a newline character.
+
+## `Or` type
+List of [`BlockProducer`](#blockproducer-type) items. Returns blocks from the first producer that
+produces at least one block.
+
+## `Separated` type
+- `separator_style` [optional]:
+  - Type: [`Style`](#style-type)
+  - Style to use for the separator.
+- `separator` [optional]:
+  - Type: `String`
+  - Separator to insert between groups of blocks generated by the producers.
+- `producers`:
+  - Type: List of [`BlockProducer`](#blockproducer-type) items
+
+## `Sequence` type
+List of [`BlockProducer`](#blockproducer-type) items. Returns blocks from all producers.
+
+## `Space` type
+Adds a space character.
+
+## `Style` type
 JSON object with the following fields:
 - `foreground` [optional]:
-  - Type: `Color` or `null`
+  - Type: [`Color`](#color-type) or `null`
 - `background` [optional]:
-  - Type: `Color` or `null`
+  - Type: [`Color`](#color-type) or `null`
 
-## `Symbol`
-Text with optional fallback for terminals that do not handle fancy text. JSON object with the
-following fields:
-- `regular`:
+## `Styled` type
+- `style` [optional]:
+  - Type: [`Style`](#style-type)
+  - Default style for items that do not specify their foreground or background color.
+- `producer`:
+  - Type: [`BlockProducer`](#blockproducer-type)
+  - Generator whose blocks the default style is applied to.
+
+## `Text` type
+- `style` [optional]:
+  - Type: [`Style`](#style-type)
+- `contents`:
   - Type: `String`
-- `fallback`:
-  - Type: `String` or `null`
-  - Displayed in case of terminals that do not support fancy characters.
 
-## `WorkingDirectory`
+## `Username` type
+- `style` [optional]:
+  - Type: [`Style`](#style-type)
+- `prefix` [optional]:
+  - Type: `String`
+  - Text to display before the username.
+
+## `WorkingDirectory` type
 Shows the current working directory. JSON object with the following fields:
 - `style` [optional]:
-  - Type: `Style`
+  - Type: [`Style`](#style-type)
 - `home_as_tilde` [optional]:
   - Type: `bool`
   - Indicates if the home directory should be displayed as a tilde.
+- `prefix` [optional]:
+  - Type: `String`
+  - Text to display before the working directory.
 
 ## Example
 ```json
 {
-    "block_producers": [
-        {
-            "Or": [
+  "prompt": {
+    "Styled": {
+      "style": {
+        "foreground": "teal",
+        "background": "black"
+      },
+      "producer": {
+        "Sequence": [
+          {
+            "Separated": {
+              "separator_style": {},
+              "separator": " | ",
+              "producers": [
                 {
-                    "GitPath": {
-                        "style": {
-                            "foreground": "limegreen"
+                  "Separated": {
+                    "separator_style": {},
+                    "separator": "@",
+                    "producers": [
+                      {
+                        "Username": {
+                          "style": {},
+                          "prefix": ""
                         }
-                    }
+                      },
+                      {
+                        "Hostname": {
+                          "style": {},
+                          "prefix": ""
+                        }
+                      }
+                    ]
+                  }
                 },
                 {
-                    "WorkingDirectory": {}
+                  "Or": [
+                    {
+                      "GitPath": {
+                        "style": {},
+                        "prefix": ""
+                      }
+                    },
+                    {
+                      "WorkingDirectory": {
+                        "style": {},
+                        "home_as_tilde": true,
+                        "prefix": ""
+                      }
+                    }
+                  ]
+                },
+                {
+                  "GitHead": {
+                    "style": {},
+                    "prefix": ""
+                  }
+                },
+                {
+                  "Elapsed": {
+                    "style": {},
+                    "prefix": "祥",
+                    "threshold": "2s"
+                  }
+                },
+                {
+                  "ExitCode": {
+                    "style": {
+                      "foreground": "crimson"
+                    },
+                    "prefix": ""
+                  }
                 }
-            ]
-        },
-        {
-            "GitHead": {}
-        }
-    ],
-    "prompt": {
-        "regular": "\u2192",
-        "fallback": ">"
-    },
-    "prompt_style": {
-        "foreground": "dodgerblue"
+              ]
+            }
+          },
+          {
+            "Newline": null
+          },
+          {
+            "ExitStatusSymbol": {
+              "style": {
+                "foreground": "dodgerblue"
+              },
+              "error_style": {
+                "foreground": "crimson"
+              },
+              "contents": "→"
+            }
+          },
+          {
+            "Space": null
+          }
+        ]
+      }
     }
+  },
+  "alternative_prompt": {
+    "Styled": {
+      "style": {
+        "foreground": "teal"
+      },
+      "producer": {
+        "Sequence": [
+          {
+            "Separated": {
+              "separator_style": {},
+              "separator": " | ",
+              "producers": [
+                {
+                  "Separated": {
+                    "separator_style": {},
+                    "separator": "@",
+                    "producers": [
+                      {
+                        "Username": {
+                          "style": {},
+                          "prefix": ""
+                        }
+                      },
+                      {
+                        "Hostname": {
+                          "style": {},
+                          "prefix": ""
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "WorkingDirectory": {
+                    "style": {},
+                    "home_as_tilde": true,
+                    "prefix": ""
+                  }
+                },
+                {
+                  "Elapsed": {
+                    "style": {},
+                    "prefix": "",
+                    "threshold": "2s"
+                  }
+                },
+                {
+                  "ExitCode": {
+                    "style": {
+                      "foreground": "crimson"
+                    },
+                    "prefix": ""
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "Newline": null
+          },
+          {
+            "ExitStatusSymbol": {
+              "style": {
+                "foreground": "dodgerblue"
+              },
+              "error_style": {
+                "foreground": "crimson"
+              },
+              "contents": "→"
+            }
+          },
+          {
+            "Space": null
+          }
+        ]
+      }
+    }
+  },
+  "timeout": "1s"
 }
 ```
 

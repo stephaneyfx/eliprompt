@@ -1,6 +1,6 @@
 // Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
 
-use crate::{Block, Environment, Error, Style, Symbol};
+use crate::{Block, Environment, Style};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -8,7 +8,7 @@ pub struct ExitCode {
     #[serde(default)]
     style: Style,
     #[serde(default = "default_prefix")]
-    prefix: Symbol,
+    prefix: String,
 }
 
 impl ExitCode {
@@ -19,21 +19,27 @@ impl ExitCode {
         }
     }
 
-    pub fn with_style(self, style: Style) -> Self {
-        Self { style, ..self }
+    pub fn with_style<T>(self, style: T) -> Self
+    where
+        T: Into<Style>,
+    {
+        Self { style: style.into(), ..self }
     }
 
-    pub fn with_prefix<S: Into<Symbol>>(self, prefix: S) -> Self {
+    pub fn with_prefix<T>(self, prefix: T) -> Self
+    where
+        T: Into<String>,
+    {
         Self { prefix: prefix.into(), ..self }
     }
 
-    pub fn produce(&self, environment: &Environment) -> Result<Vec<Block>, Error> {
+    pub fn produce(&self, environment: &Environment) -> Vec<Block> {
         match environment.prev_exit_code() {
-            0 => Ok(Vec::new()),
-            code => Ok(vec![
-                Block::new(environment.symbol_str(&self.prefix)).with_style(self.style.clone()),
-                Block::new(code.to_string()).with_style(self.style.clone()),
-            ]),
+            0 => Vec::new(),
+            code => vec![
+                Block::new(&self.prefix).with_style(&self.style),
+                Block::new(code.to_string()).with_style(&self.style),
+            ],
         }
     }
 }
@@ -44,6 +50,6 @@ impl Default for ExitCode {
     }
 }
 
-fn default_prefix() -> Symbol {
-    Symbol::from("\u{274c}").with_fallback("X")
+fn default_prefix() -> String {
+    "\u{f071}".into()
 }

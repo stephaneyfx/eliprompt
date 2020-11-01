@@ -5,17 +5,15 @@
 #![deny(warnings)]
 
 pub mod block;
-mod color;
+pub mod color;
 mod config;
 mod env;
 mod err;
 mod style;
-mod symbol;
 
 pub use block::{Block, BlockProducer};
 pub use color::Color;
-pub use config::Config;
+pub use config::{default_alternative_prompt, default_pretty_prompt, fallback_prompt, Config};
 pub use env::Environment;
 pub use err::Error;
 pub use style::Style;
-pub use symbol::Symbol;

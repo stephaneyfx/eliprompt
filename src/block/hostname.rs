@@ -4,16 +4,16 @@ use crate::{Block, Environment, Style};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct GitHead {
+pub struct Hostname {
     #[serde(default)]
     style: Style,
     #[serde(default = "default_prefix")]
     prefix: String,
 }
 
-impl GitHead {
+impl Hostname {
     pub fn new() -> Self {
-        GitHead {
+        Hostname {
             style: Default::default(),
             prefix: default_prefix(),
         }
@@ -33,36 +33,20 @@ impl GitHead {
         Self { prefix: prefix.into(), ..self }
     }
 
-    pub fn produce(&self, environment: &Environment) -> Vec<Block> {
-        let repo = match environment.repo() {
-            Some(repo) => repo,
-            None => return Vec::new(),
-        };
-        let head = repo.head();
-        let name = match head {
-            Ok(ref head) => match head.shorthand() {
-                Some(s) => s,
-                None => return Vec::new(),
-            }
-            Err(e) if e.code() == git2::ErrorCode::UnbornBranch => "master",
-            Err(e) => {
-                tracing::error!("Failed to get git repository HEAD: {}", e);
-                return Vec::new();
-            }
-        };
+    pub fn produce(&self, _: &Environment) -> Vec<Block> {
         vec![
             Block::new(&self.prefix).with_style(&self.style),
-            Block::new(name).with_style(&self.style),
+            Block::new(whoami::hostname()).with_style(&self.style),
         ]
     }
 }
 
-impl Default for GitHead {
+impl Default for Hostname {
     fn default() -> Self {
         Self::new()
     }
 }
 
 fn default_prefix() -> String {
-    "\u{e725}".into()
+    "".into()
 }

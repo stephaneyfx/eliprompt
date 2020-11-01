@@ -13,14 +13,67 @@ pub struct Style {
 
 impl Style {
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
-    pub fn with_fg(self, foreground: Color) -> Style {
-        Style { foreground: Some(foreground), ..self }
+    pub fn fg<T>(foreground: T) -> Self
+    where
+        T: Into<Color>,
+    {
+        Self { foreground: Some(foreground.into()), background: None }
     }
 
-    pub fn with_bg(self, background: Color) -> Style {
-        Style { background: Some(background), ..self }
+    pub fn bg<T>(background: T) -> Self
+    where
+        T: Into<Color>,
+    {
+        Self { background: Some(background.into()), foreground: None }
+    }
+
+    pub fn with_fg<T>(self, foreground: T) -> Style
+    where
+        T: Into<Color>,
+    {
+        Style { foreground: Some(foreground.into()), ..self }
+    }
+
+    pub fn with_bg<T>(self, background: T) -> Style
+    where
+        T: Into<Color>,
+    {
+        Style { background: Some(background.into()), ..self }
+    }
+
+    pub fn with_maybe_fg(self, foreground: Option<Color>) -> Style {
+        Style { foreground, ..self }
+    }
+
+    pub fn with_maybe_bg(self, background: Option<Color>) -> Style {
+        Style { background, ..self }
+    }
+
+    pub fn or(&self, default: &Style) -> Style {
+        Style {
+            foreground: self.foreground.clone().or_else(|| default.foreground.clone()),
+            background: self.background.clone().or_else(|| default.background.clone()),
+        }
+    }
+}
+
+impl From<Color> for Style {
+    fn from(c: Color) -> Style {
+        Style::fg(c)
+    }
+}
+
+impl From<&Color> for Style {
+    fn from(c: &Color) -> Style {
+        c.clone().into()
+    }
+}
+
+impl From<&Style> for Style {
+    fn from(s: &Style) -> Style {
+        s.clone()
     }
 }

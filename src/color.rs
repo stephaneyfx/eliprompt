@@ -3,6 +3,7 @@
 use rgb::RGB8;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
+    borrow::Cow,
     convert::{TryFrom, TryInto},
     fmt::{self, Display},
     str::FromStr,
@@ -12,7 +13,7 @@ use thiserror::Error;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Color {
     inner: RGB8,
-    name: Option<String>,
+    name: Option<Cow<'static, str>>,
 }
 
 impl Color {
@@ -23,6 +24,17 @@ impl Color {
     pub fn as_rgb(&self) -> RGB8 {
         self.inner
     }
+
+    const fn named(s: &'static str, value: palette::Srgb<u8>) -> Self {
+        Color {
+            inner: RGB8 {
+                r: value.red,
+                g: value.green,
+                b: value.blue,
+            },
+            name: Some(Cow::Borrowed(s)),
+        }
+    }
 }
 
 impl From<RGB8> for Color {
@@ -31,6 +43,12 @@ impl From<RGB8> for Color {
             inner: c,
             name: None,
         }
+    }
+}
+
+impl From<&Color> for Color {
+    fn from(c: &Color) -> Color {
+        c.clone()
     }
 }
 
@@ -46,7 +64,7 @@ impl TryFrom<String> for Color {
             (RGB8::from((bytes[1], bytes[2], bytes[3])), None)
         } else {
             let c = palette::named::from_str(&s).ok_or_else(invalid)?;
-            (RGB8::from((c.red, c.green, c.blue)), Some(s))
+            (RGB8::from((c.red, c.green, c.blue)), Some(Cow::Owned(s)))
         };
         Ok(Color {
             inner: color,
@@ -128,6 +146,29 @@ impl<'de> Deserialize<'de> for Color {
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[error("Invalid color: {0}")]
 pub struct InvalidColor(String);
+
+pub const BLACK: Color = Color::named("black", palette::named::BLACK);
+pub const CRIMSON: Color = Color::named("crimson", palette::named::CRIMSON);
+pub const CYAN: Color = Color::named("cyan", palette::named::CYAN);
+pub const DARKBLUE: Color = Color::named("darkblue", palette::named::DARKBLUE);
+pub const DARKCYAN: Color = Color::named("darkcyan", palette::named::DARKCYAN);
+pub const DARKGOLDENROD: Color = Color::named("darkgoldenrod", palette::named::DARKGOLDENROD);
+pub const DARKGREEN: Color = Color::named("darkgreen", palette::named::DARKGREEN);
+pub const DARKRED: Color = Color::named("darkred", palette::named::DARKRED);
+pub const DARKSALMON: Color = Color::named("darksalmon", palette::named::DARKSALMON);
+pub const DARKSEAGREEN: Color = Color::named("darkseagreen", palette::named::DARKSEAGREEN);
+pub const DARKSLATEGRAY: Color = Color::named("darkslategray", palette::named::DARKSLATEGRAY);
+pub const DODGERBLUE: Color = Color::named("dodgerblue", palette::named::DODGERBLUE);
+pub const FORESTGREEN: Color = Color::named("forestgreen", palette::named::FORESTGREEN);
+pub const GOLD: Color = Color::named("gold", palette::named::GOLD);
+pub const LIGHTBLUE: Color = Color::named("lightblue", palette::named::LIGHTBLUE);
+pub const LIGHTGRAY: Color = Color::named("lightgray", palette::named::LIGHTGRAY);
+pub const LIMEGREEN: Color = Color::named("limegreen", palette::named::LIMEGREEN);
+pub const MIDNIGHTBLUE: Color = Color::named("midnightblue", palette::named::MIDNIGHTBLUE);
+pub const NAVY: Color = Color::named("navy", palette::named::NAVY);
+pub const PLUM: Color = Color::named("plum", palette::named::PLUM);
+pub const TEAL: Color = Color::named("teal", palette::named::TEAL);
+pub const WHITE: Color = Color::named("white", palette::named::WHITE);
 
 #[cfg(test)]
 mod tests {

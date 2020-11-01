@@ -2,7 +2,7 @@
 
 #![deny(warnings)]
 
-use eliprompt::{Block, BlockProducer, Config, Environment, Style};
+use eliprompt::{Block, Config, Environment};
 use moniclock::Clock;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ use structopt::StructOpt;
 use thiserror::Error;
 
 /// Generates shell prompt
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, StructOpt)]
 #[structopt(author)]
 enum Command {
     Prompt(PromptCommand),
@@ -34,7 +34,7 @@ enum Command {
 }
 
 /// Prints prompt
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, StructOpt)]
 struct PromptCommand {
     /// Working directory or current working directory if not specified.
     #[structopt(long)]
@@ -48,9 +48,9 @@ struct PromptCommand {
     /// Path to the configuration file
     #[structopt(long = "config")]
     config_path: Option<PathBuf>,
-    /// Uses symbol fallback
+    /// Uses alternative prompt
     #[structopt(long)]
-    symbol_fallback: bool,
+    alternative_prompt: bool,
     /// Shell to generate prompt for
     #[structopt(long, default_value)]
     shell: ShellType,
@@ -70,7 +70,7 @@ impl Default for ShellType {
 }
 
 /// Starts timer and prints new state to stdout
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, StructOpt)]
 struct StartTimerCommand {
     /// Application state as returned from a previous run
     #[structopt(long, default_value)]
@@ -78,7 +78,7 @@ struct StartTimerCommand {
 }
 
 /// Stops timer and prints new state to stdout
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, StructOpt)]
 struct StopTimerCommand {
     /// Application state as returned from a previous run
     #[structopt(long)]
@@ -92,7 +92,7 @@ struct StopTimerCommand {
 ///
 /// The output should be `eval`'ed in the appropriate shell configuration file. For zsh, it is
 /// `.zshrc`.
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, StructOpt)]
 struct InstallCommand {
     /// Shell to install prompt for
     #[structopt(long)]
@@ -151,7 +151,18 @@ fn generate_prompt(cmd: PromptCommand) -> Result<(), AppError> {
 }
 
 fn print_or_fallback<S: Shell>(shell: &mut S, cmd: &PromptCommand) -> Result<(), AppError> {
-    match print_prompt(shell, cmd) {
+    let config = match (&cmd.config_path, &*DEFAULT_CONFIG_PATH) {
+        (Some(path), _) => read_config(path),
+        (_, Some(path)) => match read_config(path) {
+            Ok(config) => Ok(config),
+            Err(AppError::ReadingConfigFailed(e)) if e.kind() == io::ErrorKind::NotFound => {
+                Ok(Config::default_pretty())
+            }
+            e => e,
+        }
+        _ => Ok(Config::default_pretty()),
+    }?;
+    match print_prompt(shell, &config, cmd) {
         Ok(()) => Ok(()),
         Err(e) if cmd.test => Err(e),
         Err(e) => {
@@ -161,28 +172,27 @@ fn print_or_fallback<S: Shell>(shell: &mut S, cmd: &PromptCommand) -> Result<(),
     }
 }
 
-fn print_prompt<S: Shell>(shell: &mut S, cmd: &PromptCommand) -> Result<(), AppError> {
-    let config = match (&cmd.config_path, &*DEFAULT_CONFIG_PATH) {
-        (Some(path), _) => read_config(path),
-        (_, Some(path)) if path.exists() => read_config(path),
-        _ => Ok(default_pretty_config()),
-    }?;
-    let symbol_fallback = cmd.symbol_fallback;
-    let timeout = config.timeout();
-    let state = cmd.state.clone();
-    let working_dir = cmd.pwd.clone();
+fn print_prompt<S: Shell>(
+    shell: &mut S,
+    config: &Config,
+    cmd: &PromptCommand,
+) -> Result<(), AppError> {
     let (sender, receiver) = sync_channel(1);
-    let blocks = thread::spawn(move || {
-        let blocks = make_prompt(
-            &config,
-            working_dir.as_deref(),
-            symbol_fallback,
-            state,
-        );
-        drop(sender);
-        blocks
+    let blocks = thread::spawn({
+        let config = config.clone();
+        let cmd = cmd.clone();
+        move || {
+            let blocks = make_prompt(
+                &config,
+                cmd.pwd.as_deref(),
+                cmd.alternative_prompt,
+                &cmd.state,
+            );
+            drop(sender);
+            blocks
+        }
     });
-    let blocks = match receiver.recv_timeout(timeout) {
+    let blocks = match receiver.recv_timeout(config.timeout) {
         Ok(()) | Err(RecvTimeoutError::Disconnected) => {
             blocks.join().unwrap_or(Err(AppError::PromptGenerationPanicked))
         }
@@ -191,9 +201,12 @@ fn print_prompt<S: Shell>(shell: &mut S, cmd: &PromptCommand) -> Result<(), AppE
     show_prompt(shell, blocks)
 }
 
-fn show_prompt<S: Shell>(shell: &mut S, blocks: Vec<Block>) -> Result<(), AppError> {
+fn show_prompt<S: Shell>(
+    shell: &mut S,
+    blocks: Vec<Block>,
+) -> Result<(), AppError> {
     let style = blocks
-        .iter()
+        .into_iter()
         .try_fold(ansi_term::Style::new(), |style, block| {
             let s = block.render();
             let style_diff = style.infix(*s.style_ref());
@@ -209,8 +222,8 @@ fn show_prompt<S: Shell>(shell: &mut S, blocks: Vec<Block>) -> Result<(), AppErr
 fn make_prompt(
     config: &Config,
     working_dir: Option<&Path>,
-    symbol_fallback: bool,
-    state: State,
+    alternative_prompt: bool,
+    state: &State,
 ) -> Result<Vec<Block>, AppError> {
     let exit_code = state.prev_exit_code;
     let environment = match working_dir {
@@ -218,21 +231,16 @@ fn make_prompt(
         None => Environment::current(),
     }?;
     let environment = environment.with_prev_exit_code(exit_code);
-    let environment = if symbol_fallback {
-        environment.with_regular_symbols(false)
-    } else {
-        environment
-    };
     let environment = match state.prev_cmd_duration {
         CmdDuration::Elapsed(d) => environment.with_prev_cmd_duration(d),
         _ => environment,
     };
-    let blocks = config.produce(&environment)?;
-    Ok(blocks)
+    let environment = environment.force_alternative_prompt(alternative_prompt);
+    Ok(config.produce(&environment))
 }
 
 fn print_fallback_prompt<S: Shell>(shell: &mut S) -> Result<(), AppError> {
-    let blocks = Config::new().produce(&Environment::current()?)?;
+    let blocks = eliprompt::fallback_prompt().produce(&Environment::current()?);
     show_prompt(shell, blocks)
 }
 
@@ -274,15 +282,14 @@ fn read_config(path: &Path) -> Result<Config, AppError> {
 }
 
 fn install(cmd: InstallCommand) -> Result<(), AppError> {
-    let program_path = env::current_exe().map_err(AppError::GettingProgramPathFailed)?;
-    let program_path = program_path.to_str().ok_or(AppError::ProgramPathNotUnicode)?;
+    let program = "eliprompt";
     match cmd.shell {
         ShellType::Generic => Err(AppError::CannotInstallGenericShell),
-        ShellType::Zsh => install_zsh(program_path),
+        ShellType::Zsh => install_zsh(program),
     }
 }
 
-fn install_zsh(program_path: &str) -> Result<(), AppError> {
+fn install_zsh(program: &str) -> Result<(), AppError> {
     let config = r####"
 eliprompt_precmd() {
     prev_status=$?
@@ -300,7 +307,7 @@ eliprompt_preexec() {
 [[ -v preexec_functions ]] || preexec_functions=()
 [[ ${preexec_functions[(ie)eliprompt_preexec]} -le ${#preexec_functions} ]] || preexec_functions+=(eliprompt_preexec)
 "####;
-    let config = config.replace("ELIPROMPT_EXE", program_path);
+    let config = config.replace("ELIPROMPT_EXE", program);
     println!("{}", config);
     Ok(())
 }
@@ -323,10 +330,6 @@ enum AppError {
     DecodingStateFailed(#[source] bs58::decode::Error),
     #[error("Failed to parse state")]
     ParsingStateFailed(#[source] serde_json::Error),
-    #[error("Failed to get the path to this program")]
-    GettingProgramPathFailed(#[source] io::Error),
-    #[error("The path to this program is not Unicode")]
-    ProgramPathNotUnicode,
     #[error("Installation is not possible for generic shell")]
     CannotInstallGenericShell,
 }
@@ -423,36 +426,6 @@ impl<W: Write> Shell for GenericShell<W> {
     }
 }
 
-fn default_pretty_config() -> Config {
-    let producers = vec![
-        BlockProducer::Or(vec![
-            BlockProducer::GitPath(
-                eliprompt::block::GitPath::new()
-                    .with_style(Style::new().with_fg("limegreen".parse().unwrap())),
-            ),
-            BlockProducer::WorkingDirectory(
-                eliprompt::block::WorkingDirectory::new()
-                    .with_style(Style::new().with_fg("forestgreen".parse().unwrap())),
-            ),
-        ]),
-        BlockProducer::GitHead(
-            eliprompt::block::GitHead::new()
-                .with_style(Style::new().with_fg("plum".parse().unwrap())),
-        ),
-        BlockProducer::Elapsed(
-            eliprompt::block::Elapsed::new()
-                .with_style(Style::new().with_fg("gold".parse().unwrap())),
-        ),
-        BlockProducer::ExitCode(
-            eliprompt::block::ExitCode::new()
-                .with_style(Style::new().with_fg("crimson".parse().unwrap())),
-        ),
-    ];
-    Config::from_producers(producers)
-        .with_prompt_style(Style::new().with_fg("dodgerblue".parse().unwrap()))
-        .with_prompt_error_style(Style::new().with_fg("crimson".parse().unwrap()))
-}
-
 fn print_default_config() {
-    println!("{}", serde_json::to_string_pretty(&default_pretty_config()).unwrap());
+    println!("{}", serde_json::to_string_pretty(&Config::default_pretty()).unwrap());
 }
