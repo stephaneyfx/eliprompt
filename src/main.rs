@@ -145,7 +145,10 @@ fn generate_prompt(cmd: PromptCommand) -> Result<(), AppError> {
     io::stdout().write_all(&buffer).map_err(AppError::Print)?;
     let elapsed = t0.elapsed();
     if cmd.test {
-        println!("\nPrompt generation took {}", humantime::format_duration(elapsed));
+        println!(
+            "\nPrompt generation took {}",
+            humantime::format_duration(elapsed)
+        );
     }
     Ok(())
 }
@@ -159,7 +162,7 @@ fn print_or_fallback<S: Shell>(shell: &mut S, cmd: &PromptCommand) -> Result<(),
                 Ok(Config::default_pretty())
             }
             e => e,
-        }
+        },
         _ => Ok(Config::default_pretty()),
     }?;
     match print_prompt(shell, &config, cmd) {
@@ -193,18 +196,15 @@ fn print_prompt<S: Shell>(
         }
     });
     let blocks = match receiver.recv_timeout(config.timeout) {
-        Ok(()) | Err(RecvTimeoutError::Disconnected) => {
-            blocks.join().unwrap_or(Err(AppError::PromptGenerationPanicked))
-        }
+        Ok(()) | Err(RecvTimeoutError::Disconnected) => blocks
+            .join()
+            .unwrap_or(Err(AppError::PromptGenerationPanicked)),
         Err(RecvTimeoutError::Timeout) => Err(AppError::PromptGenerationTimedOut),
     }?;
     show_prompt(shell, blocks)
 }
 
-fn show_prompt<S: Shell>(
-    shell: &mut S,
-    blocks: Vec<Block>,
-) -> Result<(), AppError> {
+fn show_prompt<S: Shell>(shell: &mut S, blocks: Vec<Block>) -> Result<(), AppError> {
     let style = blocks
         .into_iter()
         .try_fold(ansi_term::Style::new(), |style, block| {
@@ -215,7 +215,9 @@ fn show_prompt<S: Shell>(
             Ok(*s.style_ref())
         })
         .map_err(AppError::Print)?;
-    shell.write_color_escape(style.suffix()).map_err(AppError::Print)?;
+    shell
+        .write_color_escape(style.suffix())
+        .map_err(AppError::Print)?;
     Ok(())
 }
 
@@ -244,10 +246,10 @@ fn print_fallback_prompt<S: Shell>(shell: &mut S) -> Result<(), AppError> {
     show_prompt(shell, blocks)
 }
 
-fn start_timer(_: StartTimerCommand) {
+fn start_timer(cmd: StartTimerCommand) {
     let state = State {
         prev_cmd_duration: CmdDuration::StartedAt(Clock::new().elapsed()),
-        prev_exit_code: 0,
+        prev_exit_code: cmd.state.prev_exit_code,
     };
     print_state(&state);
 }
@@ -258,8 +260,7 @@ fn stop_timer(cmd: StopTimerCommand) {
             let end = start.max(Clock::new().elapsed());
             CmdDuration::Elapsed(end - start)
         }
-        CmdDuration::Unknown
-        | CmdDuration::Elapsed(_) => CmdDuration::Unknown,
+        CmdDuration::Unknown | CmdDuration::Elapsed(_) => CmdDuration::Unknown,
     };
     let state = State {
         prev_exit_code: cmd.exit_code,
@@ -355,7 +356,9 @@ impl FromStr for State {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let state_str = s.trim();
-        if state_str.is_empty() { return Ok(Default::default()) }
+        if state_str.is_empty() {
+            return Ok(Default::default());
+        }
         let state_bytes = bs58::decode(state_str)
             .with_prepared_alphabet(bs58::Alphabet::BITCOIN)
             .into_vec()
@@ -385,16 +388,13 @@ struct Zsh<W>(W);
 
 impl<W: Write> Write for Zsh<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        buf
-            .iter()
-            .copied()
-            .try_fold(0, |len, b| {
-                match b {
-                    b'%' => self.0.write_all(b"%%")?,
-                    _ => self.0.write_all(&[b])?,
-                }
-                Ok(len + 1)
-            })
+        buf.iter().copied().try_fold(0, |len, b| {
+            match b {
+                b'%' => self.0.write_all(b"%%")?,
+                _ => self.0.write_all(&[b])?,
+            }
+            Ok(len + 1)
+        })
     }
 
     fn flush(&mut self) -> io::Result<()> {
@@ -427,5 +427,8 @@ impl<W: Write> Shell for GenericShell<W> {
 }
 
 fn print_default_config() {
-    println!("{}", serde_json::to_string_pretty(&Config::default_pretty()).unwrap());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&Config::default_pretty()).unwrap()
+    );
 }
