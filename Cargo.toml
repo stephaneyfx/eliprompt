@@ -2,7 +2,7 @@
 name = "eliprompt"
 version = "0.2.0"
 authors = ["Stephane Raux <stephaneyfx@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "Elegant and informative shell prompt"
 license = "Zlib"
 homepage = "https://github.com/stephaneyfx/eliprompt"
