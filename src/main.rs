@@ -2,6 +2,7 @@
 
 #![deny(warnings)]
 
+use clap::Parser;
 use eliprompt::{Block, Config, Environment};
 use moniclock::Clock;
 use once_cell::sync::Lazy;
@@ -18,12 +19,11 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use structopt::StructOpt;
 use thiserror::Error;
 
 /// Generates shell prompt
-#[derive(Clone, Debug, StructOpt)]
-#[structopt(author)]
+#[derive(Clone, Debug, Parser)]
+#[clap(author, version, about)]
 enum Command {
     Prompt(PromptCommand),
     StartTimer(StartTimerCommand),
@@ -34,25 +34,25 @@ enum Command {
 }
 
 /// Prints prompt
-#[derive(Clone, Debug, StructOpt)]
+#[derive(Clone, Debug, Parser)]
 struct PromptCommand {
     /// Working directory or current working directory if not specified.
-    #[structopt(long)]
+    #[clap(long)]
     pwd: Option<PathBuf>,
     /// Application state as returned from a previous run
-    #[structopt(long, default_value)]
+    #[clap(long, default_value_t)]
     state: State,
     /// Prints errors and duration of the prompt generation
-    #[structopt(long)]
+    #[clap(long)]
     test: bool,
     /// Path to the configuration file
-    #[structopt(long = "config")]
+    #[clap(long = "config")]
     config_path: Option<PathBuf>,
     /// Uses alternative prompt
-    #[structopt(long)]
+    #[clap(long)]
     alternative_prompt: bool,
     /// Shell to generate prompt for
-    #[structopt(long, default_value)]
+    #[clap(long, default_value_t)]
     shell: ShellType,
 }
 
@@ -70,21 +70,21 @@ impl Default for ShellType {
 }
 
 /// Starts timer and prints new state to stdout
-#[derive(Clone, Debug, StructOpt)]
+#[derive(Clone, Debug, Parser)]
 struct StartTimerCommand {
     /// Application state as returned from a previous run
-    #[structopt(long, default_value)]
+    #[clap(long, default_value_t)]
     state: State,
 }
 
 /// Stops timer and prints new state to stdout
-#[derive(Clone, Debug, StructOpt)]
+#[derive(Clone, Debug, Parser)]
 struct StopTimerCommand {
     /// Application state as returned from a previous run
-    #[structopt(long)]
+    #[clap(long)]
     state: State,
     /// Exit code of the timed command
-    #[structopt(long)]
+    #[clap(long)]
     exit_code: i32,
 }
 
@@ -92,10 +92,10 @@ struct StopTimerCommand {
 ///
 /// The output should be `eval`'ed in the appropriate shell configuration file. For zsh, it is
 /// `.zshrc`.
-#[derive(Clone, Debug, StructOpt)]
+#[derive(Clone, Debug, Parser)]
 struct InstallCommand {
     /// Shell to install prompt for
-    #[structopt(long)]
+    #[clap(long)]
     shell: ShellType,
 }
 
@@ -108,7 +108,7 @@ static DEFAULT_CONFIG_PATH: Lazy<Option<PathBuf>> = Lazy::new(|| {
 });
 
 fn run() -> Result<(), AppError> {
-    let cmd = Command::from_args();
+    let cmd = Command::parse();
     match cmd {
         Command::Prompt(cmd) => generate_prompt(cmd)?,
         Command::StartTimer(cmd) => start_timer(cmd),
@@ -272,7 +272,7 @@ fn stop_timer(cmd: StopTimerCommand) {
 fn print_state(state: &State) {
     let state_str =
         bs58::encode(serde_json::to_string(&state).expect("Serializing state cannot fail"))
-            .with_prepared_alphabet(bs58::Alphabet::BITCOIN)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
             .into_string();
     println!("{}", state_str);
 }
@@ -345,7 +345,7 @@ impl Display for State {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let state_str =
             bs58::encode(serde_json::to_string(self).expect("Serializing state cannot fail"))
-                .with_prepared_alphabet(bs58::Alphabet::BITCOIN)
+                .with_alphabet(bs58::Alphabet::BITCOIN)
                 .into_string();
         f.write_str(&state_str)
     }
@@ -360,7 +360,7 @@ impl FromStr for State {
             return Ok(Default::default());
         }
         let state_bytes = bs58::decode(state_str)
-            .with_prepared_alphabet(bs58::Alphabet::BITCOIN)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
             .into_vec()
             .map_err(AppError::DecodingStateFailed)?;
         Ok(serde_json::from_slice(&state_bytes).map_err(AppError::ParsingStateFailed)?)
