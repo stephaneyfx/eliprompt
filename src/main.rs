@@ -363,7 +363,7 @@ impl FromStr for State {
             .with_alphabet(bs58::Alphabet::BITCOIN)
             .into_vec()
             .map_err(AppError::DecodingStateFailed)?;
-        Ok(serde_json::from_slice(&state_bytes).map_err(AppError::ParsingStateFailed)?)
+        serde_json::from_slice(&state_bytes).map_err(AppError::ParsingStateFailed)
     }
 }
 

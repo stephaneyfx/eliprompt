@@ -57,19 +57,18 @@ impl TryFrom<String> for Color {
 
     fn try_from(s: String) -> Result<Color, InvalidColor> {
         let invalid = || InvalidColor(s.clone());
-        let (color, name) = if s.starts_with('#') {
-            let n = s[1..].parse::<u32>().map_err(|_| invalid())?;
-            if n & !0xffffff != 0 { return Err(invalid()) }
+        let (color, name) = if let Some(s) = s.strip_prefix('#') {
+            let n = s.parse::<u32>().map_err(|_| invalid())?;
+            if n & !0xffffff != 0 {
+                return Err(invalid());
+            }
             let bytes = n.to_be_bytes();
             (RGB8::from((bytes[1], bytes[2], bytes[3])), None)
         } else {
             let c = palette::named::from_str(&s).ok_or_else(invalid)?;
             (RGB8::from((c.red, c.green, c.blue)), Some(Cow::Owned(s)))
         };
-        Ok(Color {
-            inner: color,
-            name,
-        })
+        Ok(Color { inner: color, name })
     }
 }
 
@@ -105,7 +104,11 @@ impl Display for Color {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.name {
             Some(name) => f.write_str(name),
-            None => write!(f, "#{:02x}{:02x}{:02x}", self.inner.r, self.inner.g, self.inner.b),
+            None => write!(
+                f,
+                "#{:02x}{:02x}{:02x}",
+                self.inner.r, self.inner.g, self.inner.b
+            ),
         }
     }
 }

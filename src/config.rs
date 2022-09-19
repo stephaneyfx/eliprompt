@@ -32,7 +32,10 @@ impl Config {
     }
 
     pub fn with_alternative(self, prompt: BlockProducer) -> Self {
-        Self { alternative_prompt: Some(prompt), ..self }
+        Self {
+            alternative_prompt: Some(prompt),
+            ..self
+        }
     }
 
     pub fn with_timeout(self, timeout: Duration) -> Self {
@@ -68,9 +71,7 @@ pub fn default_pretty_prompt() -> BlockProducer {
         path,
         BlockProducer::GitHead(crate::block::GitHead::new()),
         BlockProducer::Elapsed(crate::block::Elapsed::new()),
-        BlockProducer::ExitCode(
-            crate::block::ExitCode::new().with_style(crate::color::CRIMSON)
-        ),
+        BlockProducer::ExitCode(crate::block::ExitCode::new().with_style(crate::color::CRIMSON)),
     ];
     let separated = crate::block::Separated::new(info);
     let producer = BlockProducer::Sequence(crate::block::Sequence(vec![
@@ -83,9 +84,13 @@ pub fn default_pretty_prompt() -> BlockProducer {
         ),
         BlockProducer::Space(crate::block::Space),
     ]));
-    BlockProducer::Styled(crate::block::Styled::new(producer).with_style(
-            Style::new().with_fg(crate::color::TEAL).with_bg(crate::color::BLACK),
-    ))
+    BlockProducer::Styled(
+        crate::block::Styled::new(producer).with_style(
+            Style::new()
+                .with_fg(crate::color::TEAL)
+                .with_bg(crate::color::BLACK),
+        ),
+    )
 }
 
 pub fn default_alternative_prompt() -> BlockProducer {
@@ -94,15 +99,16 @@ pub fn default_alternative_prompt() -> BlockProducer {
         BlockProducer::Hostname(crate::block::Hostname::new()),
     ];
     let id = BlockProducer::Separated(crate::block::Separated::new(id).with_separator("@"));
-    let path = BlockProducer::WorkingDirectory(
-        crate::block::WorkingDirectory::new().with_prefix(""),
-    );
+    let path =
+        BlockProducer::WorkingDirectory(crate::block::WorkingDirectory::new().with_prefix(""));
     let info = vec![
         id,
         path,
         BlockProducer::Elapsed(crate::block::Elapsed::new().with_prefix("")),
         BlockProducer::ExitCode(
-            crate::block::ExitCode::new().with_style(crate::color::CRIMSON).with_prefix("")
+            crate::block::ExitCode::new()
+                .with_style(crate::color::CRIMSON)
+                .with_prefix(""),
         ),
     ];
     let separated = crate::block::Separated::new(info);
@@ -116,22 +122,19 @@ pub fn default_alternative_prompt() -> BlockProducer {
         ),
         BlockProducer::Space(crate::block::Space),
     ]));
-    BlockProducer::Styled(crate::block::Styled::new(producer).with_style(
-            Style::new().with_fg(crate::color::TEAL),
-    ))
+    BlockProducer::Styled(
+        crate::block::Styled::new(producer).with_style(Style::new().with_fg(crate::color::TEAL)),
+    )
 }
 
 pub fn fallback_prompt() -> BlockProducer {
-    let producer = BlockProducer::Sequence(crate::block::Sequence(vec![
-        BlockProducer::ExitCode(
-            crate::block::ExitCode::new().with_style(crate::color::CRIMSON),
-        ),
+    BlockProducer::Sequence(crate::block::Sequence(vec![
+        BlockProducer::ExitCode(crate::block::ExitCode::new().with_style(crate::color::CRIMSON)),
         BlockProducer::ExitStatusSymbol(
             crate::block::ExitStatusSymbol::new(">")
                 .with_style(crate::color::DODGERBLUE)
                 .with_error_style(crate::color::CRIMSON),
         ),
         BlockProducer::Space(crate::block::Space),
-    ]));
-    producer
+    ]))
 }
