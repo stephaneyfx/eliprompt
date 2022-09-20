@@ -7,7 +7,6 @@ description = "Elegant and informative shell prompt"
 license = "0BSD"
 homepage = "https://github.com/stephaneyfx/eliprompt"
 repository = "https://github.com/stephaneyfx/eliprompt.git"
-readme = "README.md"
 keywords = ["shell", "prompt", "zsh"]
 
 [dependencies]
