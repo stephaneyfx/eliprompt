@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::{Block, Environment, Style};
 use serde::{Deserialize, Serialize};
@@ -23,14 +23,20 @@ impl GitHead {
     where
         T: Into<Style>,
     {
-        Self { style: style.into(), ..self }
+        Self {
+            style: style.into(),
+            ..self
+        }
     }
 
     pub fn with_prefix<T>(self, prefix: T) -> Self
     where
         T: Into<String>,
     {
-        Self { prefix: prefix.into(), ..self }
+        Self {
+            prefix: prefix.into(),
+            ..self
+        }
     }
 
     pub fn produce(&self, environment: &Environment) -> Vec<Block> {
@@ -43,7 +49,7 @@ impl GitHead {
             Ok(ref head) => match head.shorthand() {
                 Some(s) => s,
                 None => return Vec::new(),
-            }
+            },
             Err(e) if e.code() == git2::ErrorCode::UnbornBranch => "master",
             Err(e) => {
                 tracing::error!("Failed to get git repository HEAD: {}", e);

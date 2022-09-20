@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::Color;
 use serde::{Deserialize, Serialize};
@@ -20,28 +20,40 @@ impl Style {
     where
         T: Into<Color>,
     {
-        Self { foreground: Some(foreground.into()), background: None }
+        Self {
+            foreground: Some(foreground.into()),
+            background: None,
+        }
     }
 
     pub fn bg<T>(background: T) -> Self
     where
         T: Into<Color>,
     {
-        Self { background: Some(background.into()), foreground: None }
+        Self {
+            background: Some(background.into()),
+            foreground: None,
+        }
     }
 
     pub fn with_fg<T>(self, foreground: T) -> Style
     where
         T: Into<Color>,
     {
-        Style { foreground: Some(foreground.into()), ..self }
+        Style {
+            foreground: Some(foreground.into()),
+            ..self
+        }
     }
 
     pub fn with_bg<T>(self, background: T) -> Style
     where
         T: Into<Color>,
     {
-        Style { background: Some(background.into()), ..self }
+        Style {
+            background: Some(background.into()),
+            ..self
+        }
     }
 
     pub fn with_maybe_fg(self, foreground: Option<Color>) -> Style {
@@ -54,8 +66,14 @@ impl Style {
 
     pub fn or(&self, default: &Style) -> Style {
         Style {
-            foreground: self.foreground.clone().or_else(|| default.foreground.clone()),
-            background: self.background.clone().or_else(|| default.background.clone()),
+            foreground: self
+                .foreground
+                .clone()
+                .or_else(|| default.foreground.clone()),
+            background: self
+                .background
+                .clone()
+                .or_else(|| default.background.clone()),
         }
     }
 }

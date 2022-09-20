@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::{Block, Environment, Style};
 use dirs::home_dir;
@@ -28,18 +28,27 @@ impl WorkingDirectory {
     where
         T: Into<Style>,
     {
-        Self { style: style.into(), ..self }
+        Self {
+            style: style.into(),
+            ..self
+        }
     }
 
     pub fn with_home_as_tilde(self, home_as_tilde: bool) -> Self {
-        Self { home_as_tilde, ..self }
+        Self {
+            home_as_tilde,
+            ..self
+        }
     }
 
     pub fn with_prefix<T>(self, prefix: T) -> Self
     where
         T: Into<String>,
     {
-        Self { prefix: prefix.into(), ..self }
+        Self {
+            prefix: prefix.into(),
+            ..self
+        }
     }
 
     pub fn produce(&self, environment: &Environment) -> Vec<Block> {
@@ -50,7 +59,7 @@ impl WorkingDirectory {
                     Ok(p) if p.as_os_str().is_empty() => "~".into(),
                     Ok(p) => [Path::new("~"), p].iter().collect(),
                     Err(_) => pwd.to_owned(),
-                }
+                },
                 None => pwd.to_owned(),
             }
         } else {

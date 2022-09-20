@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::{Block, Environment, Style};
 use serde::{Deserialize, Serialize};
@@ -23,14 +23,20 @@ impl Username {
     where
         T: Into<Style>,
     {
-        Self { style: style.into(), ..self }
+        Self {
+            style: style.into(),
+            ..self
+        }
     }
 
     pub fn with_prefix<T>(self, prefix: T) -> Self
     where
         T: Into<String>,
     {
-        Self { prefix: prefix.into(), ..self }
+        Self {
+            prefix: prefix.into(),
+            ..self
+        }
     }
 
     pub fn produce(&self, _: &Environment) -> Vec<Block> {

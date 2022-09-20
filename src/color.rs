@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
 use rgb::RGB8;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::Error;
 use git2::Repository;
@@ -34,24 +34,34 @@ impl Environment {
     }
 
     pub fn with_prev_exit_code(self, code: i32) -> Self {
-        Self { prev_exit_code: code, ..self }
+        Self {
+            prev_exit_code: code,
+            ..self
+        }
     }
 
     pub fn with_prev_cmd_duration(self, d: Duration) -> Self {
-        Self { prev_cmd_duration: Some(d), ..self }
+        Self {
+            prev_cmd_duration: Some(d),
+            ..self
+        }
     }
 
     pub fn force_alternative_prompt(self, yes: bool) -> Self {
-        Self { force_alternative_prompt: yes, ..self }
+        Self {
+            force_alternative_prompt: yes,
+            ..self
+        }
     }
 
     pub fn alternative_prompt_is_used(&self) -> bool {
-        if self.force_alternative_prompt { return true; }
+        if self.force_alternative_prompt {
+            return true;
+        }
         let alternative_requested = env::var("ELIPROMPT_ALTERNATIVE_PROMPT").is_ok();
         let terms_using_alternative = ["linux"];
-        let term_uses_alternative = env::var("TERM").map_or(false, |term| {
-            terms_using_alternative.contains(&&*term)
-        });
+        let term_uses_alternative =
+            env::var("TERM").map_or(false, |term| terms_using_alternative.contains(&&*term));
         alternative_requested || term_uses_alternative
     }
 
@@ -60,14 +70,16 @@ impl Environment {
     }
 
     pub fn repo(&self) -> Option<&Repository> {
-        let repo = self.repo.get_or_init(|| match Repository::discover(&self.working_dir) {
-            Ok(repo) => Some(repo),
-            Err(e) if e.code() == git2::ErrorCode::NotFound => None,
-            Err(e) => {
-                tracing::error!("Failed to open git repository: {}", e);
-                None
-            }
-        });
+        let repo = self
+            .repo
+            .get_or_init(|| match Repository::discover(&self.working_dir) {
+                Ok(repo) => Some(repo),
+                Err(e) if e.code() == git2::ErrorCode::NotFound => None,
+                Err(e) => {
+                    tracing::error!("Failed to open git repository: {}", e);
+                    None
+                }
+            });
         repo.as_ref()
     }
 

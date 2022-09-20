@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::{Block, BlockProducer, Environment, Style};
 use serde::{Deserialize, Serialize};
@@ -17,21 +17,30 @@ impl Separated {
     where
         I: IntoIterator<Item = BlockProducer>,
     {
-        Self { producers: producers.into_iter().collect(), ..Default::default() }
+        Self {
+            producers: producers.into_iter().collect(),
+            ..Default::default()
+        }
     }
 
     pub fn with_style<T>(self, style: T) -> Self
     where
         T: Into<Style>,
     {
-        Self { separator_style: style.into(), ..self }
+        Self {
+            separator_style: style.into(),
+            ..self
+        }
     }
 
     pub fn with_separator<T>(self, separator: T) -> Self
     where
         T: Into<String>,
     {
-        Self { separator: separator.into(), ..self }
+        Self {
+            separator: separator.into(),
+            ..self
+        }
     }
 
     pub fn produce(&self, environment: &Environment) -> Vec<Block> {

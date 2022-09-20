@@ -1,7 +1,7 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
-use ansi_term::ANSIString;
 use crate::{Environment, Style};
+use ansi_term::ANSIString;
 use serde::{Deserialize, Serialize};
 
 mod elapsed;
@@ -57,7 +57,10 @@ impl Block {
     where
         T: Into<Style>,
     {
-        Block { style: style.into(), ..self }
+        Block {
+            style: style.into(),
+            ..self
+        }
     }
 
     pub fn render(&self) -> ANSIString<'_> {

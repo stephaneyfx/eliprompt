@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::{Block, BlockProducer, Environment};
 use serde::{Deserialize, Serialize};
@@ -8,9 +8,6 @@ pub struct Sequence(pub Vec<BlockProducer>);
 
 impl Sequence {
     pub fn produce(&self, environment: &Environment) -> Vec<Block> {
-        self.0
-            .iter()
-            .flat_map(|p| p.produce(environment))
-            .collect()
+        self.0.iter().flat_map(|p| p.produce(environment)).collect()
     }
 }

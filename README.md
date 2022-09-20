@@ -1,7 +1,7 @@
 # Overview
 - [📦 crates.io](https://crates.io/crates/eliprompt)
 - [📖 Documentation](https://docs.rs/eliprompt)
-- [⚖ zlib license](https://opensource.org/licenses/Zlib)
+- [⚖ 0BSD license](https://spdx.org/licenses/0BSD.html)
 
 CLI to generate a shell prompt.
 
@@ -363,7 +363,7 @@ Shows the current working directory. JSON object with the following fields:
 ```
 
 # Contribute
-All contributions shall be licensed under the [zlib license](https://opensource.org/licenses/Zlib).
+All contributions shall be licensed under the [0BSD license](https://spdx.org/licenses/0BSD.html).
 
 # Related projects
 [starship](https://github.com/starship/starship) provides more blocks and supports more shells.
