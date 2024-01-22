@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the MIT license.
 
 //! Tools to build a prompt.
 
