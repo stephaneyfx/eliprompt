@@ -1,6 +1,6 @@
 [package]
 name = "eliprompt"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Stephane Raux <stephaneyfx@gmail.com>"]
 edition = "2021"
 description = "Elegant and informative shell prompt"

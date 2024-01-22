@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "eliprompt"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ansi_term",
  "bs58",
