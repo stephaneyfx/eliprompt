@@ -205,7 +205,7 @@ fn show_prompt<S: Shell>(shell: &mut S, blocks: Vec<Block>) -> Result<(), AppErr
         .try_fold(ansi_term::Style::new(), |style, block| {
             let s = block.render();
             let style_diff = style.infix(*s.style_ref());
-            shell.write_color_escape(&style_diff)?;
+            shell.write_color_escape(style_diff)?;
             write!(shell, "{}", &*s)?;
             Ok(*s.style_ref())
         })
