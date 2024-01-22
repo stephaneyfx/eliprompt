@@ -56,17 +56,12 @@ struct PromptCommand {
     shell: ShellType,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, strum::Display, strum::EnumString)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, strum::Display, strum::EnumString)]
 #[strum(serialize_all = "kebab-case")]
 enum ShellType {
+    #[default]
     Generic,
     Zsh,
-}
-
-impl Default for ShellType {
-    fn default() -> Self {
-        ShellType::Generic
-    }
 }
 
 /// Starts timer and prints new state to stdout
