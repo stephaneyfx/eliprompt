@@ -193,7 +193,7 @@ fn print_prompt<S: Shell>(
     let blocks = match receiver.recv_timeout(config.timeout) {
         Ok(()) | Err(RecvTimeoutError::Disconnected) => blocks
             .join()
-            .unwrap_or(Err(AppError::PromptGenerationPanicked)),
+            .map_err(|_| AppError::PromptGenerationPanicked),
         Err(RecvTimeoutError::Timeout) => Err(AppError::PromptGenerationTimedOut),
     }?;
     show_prompt(shell, blocks)
@@ -221,23 +221,23 @@ fn make_prompt(
     working_dir: Option<&Path>,
     alternative_prompt: bool,
     state: &State,
-) -> Result<Vec<Block>, AppError> {
+) -> Vec<Block> {
     let exit_code = state.prev_exit_code;
     let environment = match working_dir {
-        Some(p) => Environment::new(p),
+        Some(p) => Environment::new(Some(p.to_owned())),
         None => Environment::current(),
-    }?;
+    };
     let environment = environment.with_prev_exit_code(exit_code);
     let environment = match state.prev_cmd_duration {
         CmdDuration::Elapsed(d) => environment.with_prev_cmd_duration(d),
         _ => environment,
     };
     let environment = environment.force_alternative_prompt(alternative_prompt);
-    Ok(config.produce(&environment))
+    config.produce(&environment)
 }
 
 fn print_fallback_prompt<S: Shell>(shell: &mut S) -> Result<(), AppError> {
-    let blocks = eliprompt::fallback_prompt().produce(&Environment::current()?);
+    let blocks = eliprompt::fallback_prompt().produce(&Environment::current());
     show_prompt(shell, blocks)
 }
 

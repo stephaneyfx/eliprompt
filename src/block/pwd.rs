@@ -52,22 +52,21 @@ impl WorkingDirectory {
     }
 
     pub fn produce(&self, environment: &Environment) -> Vec<Block> {
-        let pwd = environment.working_dir();
-        let pwd = if self.home_as_tilde {
-            match home_dir() {
-                Some(home) => match pwd.strip_prefix(home) {
-                    Ok(p) if p.as_os_str().is_empty() => "~".into(),
-                    Ok(p) => [Path::new("~"), p].iter().collect(),
-                    Err(_) => pwd.to_owned(),
-                },
-                None => pwd.to_owned(),
+        let pwd = match environment.working_dir() {
+            Some(pwd) if self.home_as_tilde => {
+                match home_dir().and_then(|home| pwd.strip_prefix(home).ok()) {
+                    Some(p) if p.as_os_str().is_empty() => "~".into(),
+                    Some(p) => [Path::new("~"), p].iter().collect(),
+                    None => pwd.to_owned(),
+                }
             }
-        } else {
-            pwd.to_owned()
+            Some(pwd) => pwd.to_owned(),
+            None => "<NONE>".into(),
         };
+        let pwd = pwd.to_string_lossy();
         vec![
             Block::new(&self.prefix).with_style(&self.style),
-            Block::new(pwd.to_string_lossy()).with_style(&self.style),
+            Block::new(pwd).with_style(&self.style),
         ]
     }
 }

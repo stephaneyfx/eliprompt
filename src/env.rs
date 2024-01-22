@@ -1,6 +1,5 @@
 // Copyright (C) 2020 Stephane Raux. Distributed under the MIT license.
 
-use crate::Error;
 use git2::Repository;
 use once_cell::sync::OnceCell;
 use std::{
@@ -11,7 +10,7 @@ use std::{
 };
 
 pub struct Environment {
-    working_dir: PathBuf,
+    working_dir: Option<PathBuf>,
     prev_exit_code: i32,
     repo: OnceCell<Option<Repository>>,
     prev_cmd_duration: Option<Duration>,
@@ -19,18 +18,17 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn new<P: Into<PathBuf>>(working_dir: P) -> Result<Self, Error> {
-        Ok(Environment {
-            working_dir: working_dir.into(),
+    pub fn new(working_dir: Option<PathBuf>) -> Self {
+        Environment {
+            working_dir,
             prev_exit_code: 0,
             repo: OnceCell::new(),
             prev_cmd_duration: None,
             force_alternative_prompt: false,
-        })
+        }
     }
-    pub fn current() -> Result<Self, Error> {
-        let working_dir = env::current_dir().map_err(Error::GettingPwdFailed)?;
-        Self::new(working_dir)
+    pub fn current() -> Self {
+        Self::new(env::current_dir().ok())
     }
 
     pub fn with_prev_exit_code(self, code: i32) -> Self {
@@ -65,21 +63,20 @@ impl Environment {
         alternative_requested || term_uses_alternative
     }
 
-    pub fn working_dir(&self) -> &Path {
-        &self.working_dir
+    pub fn working_dir(&self) -> Option<&Path> {
+        self.working_dir.as_deref()
     }
 
     pub fn repo(&self) -> Option<&Repository> {
-        let repo = self
-            .repo
-            .get_or_init(|| match Repository::discover(&self.working_dir) {
-                Ok(repo) => Some(repo),
-                Err(e) if e.code() == git2::ErrorCode::NotFound => None,
-                Err(e) => {
-                    tracing::error!("Failed to open git repository: {}", e);
-                    None
-                }
-            });
+        let dir = self.working_dir.as_ref()?;
+        let repo = self.repo.get_or_init(|| match Repository::discover(dir) {
+            Ok(repo) => Some(repo),
+            Err(e) if e.code() == git2::ErrorCode::NotFound => None,
+            Err(e) => {
+                tracing::error!("Failed to open git repository: {}", e);
+                None
+            }
+        });
         repo.as_ref()
     }
 

@@ -47,13 +47,14 @@ impl GitPath {
         let path = if repo.is_bare() {
             return Vec::new();
         } else {
-            match repo.path().parent().and_then(|p| p.parent()) {
-                Some(p) => match environment.working_dir().strip_prefix(p) {
-                    Ok(p) => p,
-                    Err(_) => return Vec::new(),
-                },
-                None => return Vec::new(),
-            }
+            let Some(p) = repo
+                .path()
+                .parent()
+                .and_then(|p| environment.working_dir()?.strip_prefix(p.parent()?).ok())
+            else {
+                return Vec::new();
+            };
+            p
         };
         vec![
             Block::new(&self.prefix).with_style(&self.style),
