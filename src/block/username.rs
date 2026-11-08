@@ -40,9 +40,16 @@ impl Username {
     }
 
     pub fn produce(&self, _: &Environment) -> Vec<Block> {
+        let username = match whoami::username() {
+            Ok(name) => name,
+            Err(e) => {
+                tracing::error!("Failed to get username: {e}");
+                return Vec::new();
+            }
+        };
         vec![
             Block::new(&self.prefix).with_style(&self.style),
-            Block::new(whoami::username()).with_style(&self.style),
+            Block::new(username).with_style(&self.style),
         ]
     }
 }

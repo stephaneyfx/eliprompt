@@ -47,12 +47,15 @@ impl GitHead {
         let head = repo.head();
         let name = match head {
             Ok(ref head) => match head.shorthand() {
-                Some(s) => s,
-                None => return Vec::new(),
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!("Failed to get shorthand for HEAD: {e}");
+                    return Vec::new();
+                }
             },
             Err(e) if e.code() == git2::ErrorCode::UnbornBranch => "master",
             Err(e) => {
-                tracing::error!("Failed to get git repository HEAD: {}", e);
+                tracing::error!("Failed to get git repository HEAD: {e}");
                 return Vec::new();
             }
         };

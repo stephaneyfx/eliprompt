@@ -40,9 +40,16 @@ impl Hostname {
     }
 
     pub fn produce(&self, _: &Environment) -> Vec<Block> {
+        let hostname = match whoami::hostname() {
+            Ok(name) => name,
+            Err(e) => {
+                tracing::error!("Failed to get hostname: {e}");
+                return Vec::new();
+            }
+        };
         vec![
             Block::new(&self.prefix).with_style(&self.style),
-            Block::new(whoami::hostname()).with_style(&self.style),
+            Block::new(hostname).with_style(&self.style),
         ]
     }
 }

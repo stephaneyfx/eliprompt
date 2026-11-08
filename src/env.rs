@@ -1,18 +1,18 @@
 // Copyright (C) 2020 Stephane Raux. Distributed under the MIT license.
 
 use git2::Repository;
-use once_cell::sync::OnceCell;
 use std::{
     env,
     fmt::{self, Debug},
     path::{Path, PathBuf},
+    sync::OnceLock,
     time::Duration,
 };
 
 pub struct Environment {
     working_dir: Option<PathBuf>,
     prev_exit_code: i32,
-    repo: OnceCell<Option<Repository>>,
+    repo: OnceLock<Option<Repository>>,
     prev_cmd_duration: Option<Duration>,
     force_alternative_prompt: bool,
 }
@@ -22,7 +22,7 @@ impl Environment {
         Environment {
             working_dir,
             prev_exit_code: 0,
-            repo: OnceCell::new(),
+            repo: OnceLock::new(),
             prev_cmd_duration: None,
             force_alternative_prompt: false,
         }

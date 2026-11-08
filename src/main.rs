@@ -5,7 +5,6 @@
 use clap::Parser;
 use eliprompt::{Block, Config, Environment};
 use moniclock::Clock;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -15,7 +14,10 @@ use std::{
     io::{self, Write},
     path::{Path, PathBuf},
     str::FromStr,
-    sync::mpsc::{sync_channel, RecvTimeoutError},
+    sync::{
+        LazyLock,
+        mpsc::{RecvTimeoutError, sync_channel},
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -96,7 +98,7 @@ struct InstallCommand {
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 
-static DEFAULT_CONFIG_PATH: Lazy<Option<PathBuf>> = Lazy::new(|| {
+static DEFAULT_CONFIG_PATH: LazyLock<Option<PathBuf>> = LazyLock::new(|| {
     let mut path = dirs::config_dir()?;
     path.extend(&[APP_NAME, "config.json"]);
     Some(path)
