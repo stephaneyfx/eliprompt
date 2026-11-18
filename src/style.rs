@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Stephane Raux. Distributed under the MIT license.
+// Copyright (C) 2020 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::Color;
 use serde::{Deserialize, Serialize};
