@@ -10,7 +10,10 @@ pub struct Config {
     pub prompt: BlockProducer,
     #[serde(default)]
     pub alternative_prompt: Option<BlockProducer>,
-    #[serde(with = "humantime_serde", default = "default_timeout")]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default = "default_timeout"
+    )]
     pub timeout: Duration,
 }
 

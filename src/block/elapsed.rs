@@ -10,7 +10,10 @@ pub struct Elapsed {
     style: Style,
     #[serde(default = "default_prefix")]
     prefix: String,
-    #[serde(with = "humantime_serde", default = "default_threshold")]
+    #[serde(
+        with = "jiff::fmt::serde::unsigned_duration::friendly::compact::required",
+        default = "default_threshold"
+    )]
     threshold: Duration,
 }
 
@@ -47,8 +50,9 @@ impl Elapsed {
         match environment.prev_cmd_duration() {
             Some(elapsed) if elapsed >= self.threshold => {
                 let elapsed = Duration::from_secs(elapsed.as_secs())
-                    + Duration::from_millis(elapsed.subsec_millis() as u64);
-                let elapsed = humantime::format_duration(elapsed).to_string();
+                    + Duration::from_millis(elapsed.subsec_millis().into());
+                let elapsed =
+                    jiff::fmt::friendly::SpanPrinter::new().unsigned_duration_to_string(&elapsed);
                 vec![
                     Block::new(&self.prefix).with_style(&self.style),
                     Block::new(elapsed).with_style(&self.style),

@@ -144,7 +144,7 @@ fn generate_prompt(cmd: PromptCommand) -> Result<(), AppError> {
     if cmd.test {
         println!(
             "\nPrompt generation took {}",
-            humantime::format_duration(elapsed)
+            jiff::fmt::friendly::SpanPrinter::new().unsigned_duration_to_string(&elapsed)
         );
     }
     Ok(())
